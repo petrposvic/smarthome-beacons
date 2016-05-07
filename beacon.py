@@ -13,16 +13,18 @@ class Beacon:
         self.tx_power = tx_power
         self.rssi = rssi
         self.timestamp = timestamp
+        self.active = False
 
     def jsonify(self):
         return {
             "mac": self.mac_address,
-            "id": self.uuid,
+            "uuid": self.uuid,
             "major": self.major_number,
             "minor": self.minor_number,
             "tx": self.tx_power,
             "rssi": self.rssi,
-            "timestamp": self.timestamp
+            "timestamp": self.timestamp,
+            "active": self.active
         }
 
     def __eq__(self, other):

@@ -9,6 +9,9 @@ import sys
 import bluetooth._bluetooth as bluez
 import beacon as b
 
+# Use mock data
+mock = False
+
 
 class Main:
     """Main class"""
@@ -16,29 +19,29 @@ class Main:
     sock_bt = None
     timer = 0
 
-    def __init__(self, device_name, rest_url, interval, beacons):
+    def __init__(self, device_name, rest_url, beacons):
         """Gets configuration"""
 
         self.device_name = device_name
         self.rest_url = rest_url
-        self.interval = interval
         self.beacons = beacons
 
-        dev_id = 0
-        try:
-            self.sock_bt = bluez.hci_open_dev(dev_id)
-            print("ble thread started")
-        except:
-            print("error accessing bluetooth device...")
-            sys.exit(1)
+        if not mock:
+            dev_id = 0
+            try:
+                self.sock_bt = bluez.hci_open_dev(dev_id)
+                print("ble thread started")
+            except:
+                print("error accessing bluetooth device...")
+                sys.exit(1)
 
-        blescan.hci_le_set_scan_parameters(self.sock_bt)
-        blescan.hci_enable_le_scan(self.sock_bt)
+            blescan.hci_le_set_scan_parameters(self.sock_bt)
+            blescan.hci_enable_le_scan(self.sock_bt)
 
     def run(self):
         """Run infinite loop"""
 
-        if self.sock_bt is None:
+        if not mock and self.sock_bt is None:
             print("bluetooth socket error")
             sys.exit(0)
 
@@ -54,9 +57,15 @@ class Main:
         now = time.time()
         time.sleep(1)
 
-        discovered = b.parse_beacon_list(blescan.parse_events(
-            self.sock_bt, len(self.beacons)
-        ))
+        if mock:
+            discovered = b.parse_beacon_list([
+                'fc:be:ba:1c:e5:30,5689a6fabfa2bd01467d6e00fbabad05,5642,6151,6,-90',
+            ])
+
+        else:
+            discovered = b.parse_beacon_list(blescan.parse_events(
+                self.sock_bt, len(self.beacons)
+            ))
 
         # Update beacons by discovered beacons
         payload = []
@@ -71,14 +80,15 @@ class Main:
                 # print "unknown beacon " + str(beacon)
                 pass
 
-        # Send keep alive
-        self.timer += 1
-        if self.timer >= self.interval:
-            self.timer = 0
-
-            self.send("/api/beacons", json.dumps({
-                "name": self.device_name, "beacons": payload
-            }))
+        for beacon in self.beacons:
+            if beacon.timestamp < now - 60:
+                if beacon.active:
+                    beacon.active = False
+                    self.send("/api/beacons", json.dumps(beacon.jsonify()))
+            else:
+                if not beacon.active:
+                    beacon.active = True
+                    self.send("/api/beacons", json.dumps(beacon.jsonify()))
 
     def send(self, url, payload):
         """
@@ -103,7 +113,7 @@ class Main:
 
 
 if __name__ == "__main__":
-    Main("livingroom", "http://192.168.1.203:3000", 1, [
+    Main("livingroom", "http://192.168.1.203:3000", [
         b.Beacon("fc:be:ba:1c:e5:30", "kocar1"),
         b.Beacon("84:a4:66:89:39:58", "kocar2"),
     ]).run()
