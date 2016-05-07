@@ -17,6 +17,7 @@ DEBUG = False
 
 import os
 import sys
+import select
 import struct
 import bluetooth._bluetooth as bluez
 
@@ -123,6 +124,12 @@ def parse_events(sock, loop_count=100):
     bluez.hci_filter_all_events(flt)
     bluez.hci_filter_set_ptype(flt, bluez.HCI_EVENT_PKT)
     sock.setsockopt( bluez.SOL_HCI, bluez.HCI_FILTER, flt )
+
+    sock.setblocking(0)
+    ready = select.select([sock], [], [], 5)
+    if not ready[0]:
+        return []
+
     done = False
     results = []
     myFullList = []

@@ -59,29 +59,26 @@ class Main:
 
         if mock:
             discovered = b.parse_beacon_list([
-                'fc:be:ba:1c:e5:30,5689a6fabfa2bd01467d6e00fbabad05,5642,6151,6,-90',
+                'c6:f8:b3:66:d1:95,e2c56db5dffb48d2b060d0f5a71096e0,0,0,-59,-37',
             ])
-
         else:
             discovered = b.parse_beacon_list(blescan.parse_events(
                 self.sock_bt, len(self.beacons)
             ))
 
         # Update beacons by discovered beacons
-        payload = []
         for beacon in discovered:
             try:
                 index = self.beacons.index(beacon)
                 self.beacons[index].tx_power = beacon.tx_power
                 self.beacons[index].rssi = beacon.rssi
                 self.beacons[index].timestamp = now
-                payload.append(self.beacons[index].jsonify())
             except ValueError:
                 # print "unknown beacon " + str(beacon)
                 pass
 
         for beacon in self.beacons:
-            if beacon.timestamp < now - 60:
+            if beacon.timestamp < now - 20:
                 if beacon.active:
                     beacon.active = False
                     self.send("/api/beacons", json.dumps(beacon.jsonify()))
@@ -100,21 +97,19 @@ class Main:
 
         print(url + ": " + payload)
         try:
-            r = requests.post(
+            requests.post(
                 self.rest_url + url,
                 headers={
                     "Content-Type": "application/json"
                 },
                 data=payload
             )
-            # print(r)
         except requests.exceptions.ConnectionError:
             print('Connection error')
 
 
 if __name__ == "__main__":
     Main("livingroom", "http://192.168.1.203:3000", [
-        b.Beacon("fc:be:ba:1c:e5:30", "kocar1"),
-        b.Beacon("84:a4:66:89:39:58", "kocar2"),
+        b.Beacon("c6:f8:b3:66:d1:95", "kocar"),
     ]).run()
 
