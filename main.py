@@ -17,7 +17,7 @@ class Main:
     """Main class"""
 
     sock_bt = None
-    timer = 0
+    started_at = time.time()
 
     def __init__(self, device_name, rest_url, beacons):
         """Gets configuration"""
@@ -70,8 +70,10 @@ class Main:
         for beacon in discovered:
             try:
                 index = self.beacons.index(beacon)
-                self.beacons[index].tx_power = beacon.tx_power
-                self.beacons[index].rssi = beacon.rssi
+                self.beacons[index].tx_power.pop(0)
+                self.beacons[index].tx_power.append(beacon.last_tx_power())
+                self.beacons[index].rssi.pop(0)
+                self.beacons[index].rssi.append(beacon.last_rssi())
                 self.beacons[index].timestamp = now
             except ValueError:
                 # print "unknown beacon " + str(beacon)
@@ -82,10 +84,22 @@ class Main:
                 if beacon.active:
                     beacon.active = False
                     self.send("/api/beacons", json.dumps(beacon.jsonify()))
+                else:
+                    if beacon.is_inactive_long_time(now):
+                        if now - self.started_at > 10:
+                            self.send("/api/beacons", json.dumps(beacon.jsonify()))
+                        else:
+                            print("too early to send changed rssi")
             else:
                 if not beacon.active:
                     beacon.active = True
                     self.send("/api/beacons", json.dumps(beacon.jsonify()))
+                else:
+                    if beacon.is_active_long_time(now) or beacon.is_rssi_changed():
+                        if now - self.started_at > 10:
+                            self.send("/api/beacons", json.dumps(beacon.jsonify()))
+                        else:
+                            print("too early to send changed rssi")
 
     def send(self, url, payload):
         """
